@@ -1,0 +1,8 @@
+ipch/
+[Dd]ebug
+
+*.sdf
+*.opensdf
+*.pdb
+*.ncrunchsolution
+*.user
