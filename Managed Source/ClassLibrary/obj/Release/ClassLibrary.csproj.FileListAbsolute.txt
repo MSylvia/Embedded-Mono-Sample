@@ -1,0 +1,5 @@
+D:\Dev\INK\Embedded-Mono-Sample\Build\ClassLibrary.dll
+D:\Dev\INK\Embedded-Mono-Sample\Build\ClassLibrary.pdb
+D:\Dev\INK\Embedded-Mono-Sample\Managed Source\ClassLibrary\obj\Release\ClassLibrary.csprojResolveAssemblyReference.cache
+D:\Dev\INK\Embedded-Mono-Sample\Managed Source\ClassLibrary\obj\Release\ClassLibrary.dll
+D:\Dev\INK\Embedded-Mono-Sample\Managed Source\ClassLibrary\obj\Release\ClassLibrary.pdb

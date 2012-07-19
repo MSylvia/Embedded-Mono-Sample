@@ -10616,9 +10616,7 @@ inflate_method (MonoReflectionType *type, MonoObject *obj)
 
 /*TODO avoid saving custom attrs for generic classes as it's enough to have them on the generic type definition.*/
 void
-mono_reflection_generic_class_initialize (MonoReflectionGenericClass *type, MonoArray *methods, 
-					  MonoArray *ctors, MonoArray *fields, MonoArray *properties,
-					  MonoArray *events)
+mono_reflection_generic_class_initialize (MonoReflectionGenericClass *type, MonoArray *fields)
 {
 	MonoGenericClass *gclass;
 	MonoDynamicGenericClass *dgclass;
@@ -10926,7 +10924,7 @@ mono_reflection_get_dynamic_overrides (MonoClass *klass, MonoMethod ***overrides
 				for (j = 0; j < mono_array_length (mb->override_methods); ++j) {
 					m = mono_array_get (mb->override_methods, MonoReflectionMethod*, j);
 
-					(*overrides) [onum * 2] = mono_reflection_method_get_handle (m);
+					(*overrides) [onum * 2] = mono_reflection_method_get_handle ((MonoObject*)m);
 					(*overrides) [onum * 2 + 1] = mb->mhandle;
 
 					g_assert (mb->mhandle);
@@ -12056,9 +12054,7 @@ mono_image_register_token (MonoDynamicImage *assembly, guint32 token, MonoObject
 }
 
 void
-mono_reflection_generic_class_initialize (MonoReflectionGenericClass *type, MonoArray *methods, 
-					  MonoArray *ctors, MonoArray *fields, MonoArray *properties,
-					  MonoArray *events)
+mono_reflection_generic_class_initialize (MonoReflectionGenericClass *type, MonoArray *fields)
 {
 	g_assert_not_reached ();
 }

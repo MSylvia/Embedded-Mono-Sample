@@ -1365,7 +1365,7 @@ check_usable (MonoAssembly *assembly, MonoAotFileInfo *info, char **out_msg)
 		usable = FALSE;
 	}
 
-	if (info->simd_opts & ~mono_arch_cpu_enumerate_simd_versions ()) {
+	if (!mono_aot_only && (info->simd_opts & ~mono_arch_cpu_enumerate_simd_versions ())) {
 		msg = g_strdup_printf ("compiled with unsupported SIMD extensions");
 		usable = FALSE;
 	}
@@ -2483,7 +2483,7 @@ MonoJitInfo *
 mono_aot_find_jit_info (MonoDomain *domain, MonoImage *image, gpointer addr)
 {
 	int pos, left, right, offset, offset1, offset2, code_len;
-	int method_index, table_len, is_wrapper;
+	int method_index, table_len;
 	guint32 token;
 	MonoAotModule *amodule = image->aot_module;
 	MonoMethod *method;
@@ -2605,14 +2605,9 @@ mono_aot_find_jit_info (MonoDomain *domain, MonoImage *image, gpointer addr)
 			}
 
 			p = amodule->blob + table [(pos * 2) + 1];
-			is_wrapper = decode_value (p, &p);
-			if (is_wrapper)
-				/* Happens when a random address is passed in which matches a not-yey called wrapper encoded using its name */
-				return NULL;
-			g_assert (!is_wrapper);
 			method = decode_resolve_method_ref (amodule, p, &p);
 			if (!method)
-				/* Ditto */
+				/* Happens when a random address is passed in which matches a not-yey called wrapper encoded using its name */
 				return NULL;
 		} else {
 			token = mono_metadata_make_token (MONO_TABLE_METHOD, method_index + 1);

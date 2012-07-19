@@ -30,6 +30,6 @@ class MyClass
     public static event MyDelegate Event26;
     public static event MyDelegate Event27;
     public static event MyDelegate Event28;
-    // Comment out Event29 and the freeze won't occur.
-    public static event MyDelegate Event29;
+	public static event MyDelegate Event29;
+	public static event MyDelegate Event30;
 }

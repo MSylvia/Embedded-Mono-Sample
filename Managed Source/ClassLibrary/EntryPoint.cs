@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 using System.IO;
 using System.CodeDom.Compiler;
@@ -13,10 +14,15 @@ namespace ClassLibraryNamespace
     {
         public ClassLibraryManager()
         {
-            System.Console.WriteLine("sup.");
+			AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionOccurred;
 
-            TestJIT();
-        }
+			TestJIT();
+		}
+
+		private static void UnhandledExceptionOccurred(object sender, UnhandledExceptionEventArgs e)
+		{
+			Console.WriteLine(e.ExceptionObject.ToString());
+		}
 
         public void TestJIT()
         {
@@ -32,20 +38,39 @@ namespace ClassLibraryNamespace
 
             Console.WriteLine(scriptsDirectory);
 
-            var scripts = new List<string>();
             foreach (var script in Directory.GetFiles(scriptsDirectory, "*.cs", SearchOption.AllDirectories))
             {
-                Console.WriteLine(script);
-                scripts.Add(script);
+				Console.WriteLine("Compiling script {0}", script);
+
+				using (var provider = CodeDomProvider.CreateProvider("csharp"))
+				{
+					Action action = () => provider.CompileAssemblyFromFile(compilerParameters, script);
+					try
+					{
+						TryDo(action, 5000);
+					}
+					catch (TimeoutException ex)
+					{
+						Console.WriteLine("Failed to compile script {0}, timeout was triggered", script);
+					}
+				}
             }
-
-            Console.WriteLine("Compiling");
-
-            CompilerResults results;
-            using (var provider = CodeDomProvider.CreateProvider("csharp"))
-                results = provider.CompileAssemblyFromFile(compilerParameters, scripts.ToArray());
-
-            Console.WriteLine("done compiling, assembly is {0}", results.CompiledAssembly != null ? "OK" : "invalid!");
         }
+
+		static void TryDo(Action action, int timeout)
+		{
+			var waitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
+
+			{
+				AsyncCallback callback = ar => waitHandle.Set();
+				action.BeginInvoke(callback, null);
+
+				if (!waitHandle.WaitOne(timeout))
+				{
+					waitHandle.Reset();
+					throw new TimeoutException("Failed to complete in the timeout specified.");
+				}
+			}
+		}
     }
 }

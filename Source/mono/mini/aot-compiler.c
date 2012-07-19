@@ -1330,7 +1330,7 @@ arch_emit_imt_thunk (MonoAotCompile *acfg, int offset, int *tramp_size)
 #if defined(__native_client_codegen__)
 	guint8 *buf_alloc;
 #endif
-	guint8 *labels [3];
+	guint8 *labels [16];
 	guint8 mov_buf[3];
 	guint8 *mov_buf_ptr = mov_buf;
 
@@ -1370,8 +1370,18 @@ arch_emit_imt_thunk (MonoAotCompile *acfg, int offset, int *tramp_size)
 	amd64_jump_membase (code, MONO_ARCH_IMT_SCRATCH_REG, 0);
 
 	/* No match */
-	/* FIXME: */
 	mono_amd64_patch (labels [1], code);
+	/* Load fail tramp */
+	amd64_alu_reg_imm (code, X86_ADD, MONO_ARCH_IMT_SCRATCH_REG, sizeof (gpointer));
+	/* Check if there is a fail tramp */
+	amd64_alu_membase_imm (code, X86_CMP, MONO_ARCH_IMT_SCRATCH_REG, 0, 0);
+	labels [3] = code;
+	amd64_branch8 (code, X86_CC_Z, 0, FALSE);
+	/* Jump to fail tramp */
+	amd64_jump_membase (code, MONO_ARCH_IMT_SCRATCH_REG, 0);
+
+	/* Fail */
+	mono_amd64_patch (labels [3], code);
 	x86_breakpoint (code);
 
 	/* mov <OFFSET>(%rip), MONO_ARCH_IMT_SCRATCH_REG */
@@ -1400,7 +1410,7 @@ arch_emit_imt_thunk (MonoAotCompile *acfg, int offset, int *tramp_size)
 #ifdef __native_client_codegen__
 	guint8 *buf_alloc;
 #endif
-	guint8 *labels [3];
+	guint8 *labels [16];
 
 #if defined(__default_codegen__)
 	code = buf = g_malloc (256);
@@ -1445,8 +1455,19 @@ arch_emit_imt_thunk (MonoAotCompile *acfg, int offset, int *tramp_size)
 	x86_ret (code);
 
 	/* No match */
-	/* FIXME: */
 	mono_x86_patch (labels [1], code);
+	/* Load fail tramp */
+	x86_mov_reg_membase (code, X86_EAX, X86_EAX, sizeof (gpointer), 4);
+	x86_alu_membase_imm (code, X86_CMP, X86_EAX, 0, 0);
+	labels [3] = code;
+	x86_branch8 (code, X86_CC_Z, FALSE, 0);
+	/* Jump to fail tramp */
+	x86_mov_membase_reg (code, X86_ESP, 4, X86_EAX, 4);
+	x86_pop_reg (code, X86_EAX);
+	x86_ret (code);
+
+	/* Fail */
+	mono_x86_patch (labels [3], code);
 	x86_breakpoint (code);
 
 #ifdef __native_client_codegen__
