@@ -16,7 +16,11 @@ namespace ClassLibraryNamespace
         {
 			AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionOccurred;
 
-			TestJIT();
+			// Uncomment to test bug 6035 related to a child domain's AssemblyResolve event.
+			//Xamarin6035_AssemblyResolve_Crash();
+
+			// Uncomment to test bug 5938 related to a CSharpCodeProvider freeze
+			//TestJIT();
 		}
 
 		private static void UnhandledExceptionOccurred(object sender, UnhandledExceptionEventArgs e)
@@ -71,6 +75,17 @@ namespace ClassLibraryNamespace
 					throw new TimeoutException("Failed to complete in the timeout specified.");
 				}
 			}
+		}
+
+		public void Xamarin6035_AssemblyResolve_Crash()
+		{
+			var appDomain = AppDomain.CreateDomain("Xamarin6035_AppDomain");
+			appDomain.AssemblyResolve += (sender, args) =>
+			{
+				Console.WriteLine("resolving {0} requested by {1}", args.Name, args.RequestingAssembly.FullName);
+
+				return null;
+			};
 		}
     }
 }
