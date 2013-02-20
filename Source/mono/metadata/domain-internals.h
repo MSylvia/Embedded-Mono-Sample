@@ -91,11 +91,16 @@ typedef struct {
 } MonoJitExceptionInfo;
 
 /*
- * Will contain information on the generic type arguments in the
- * future.  For now, all arguments are always reference types.
+ * Contains information about the type arguments for generic shared methods.
  */
 typedef struct {
-	int dummy;
+	/*
+	 * If not NULL, determines whenever the class type arguments of the gshared method are references or vtypes.
+	 * The array length is equal to class_inst->type_argv.
+	 */
+	gboolean *var_is_vt;
+	/* Same for method type parameters */
+	gboolean *mvar_is_vt;
 } MonoGenericSharingContext;
 
 /* Simplified DWARF location list entry */
@@ -170,6 +175,16 @@ typedef struct
 	guint32 stack_size;
 } MonoArchEHJitInfo;
 
+typedef struct {
+	gboolean    cas_inited:1;
+	gboolean    cas_class_assert:1;
+	gboolean    cas_class_deny:1;
+	gboolean    cas_class_permitonly:1;
+	gboolean    cas_method_assert:1;
+	gboolean    cas_method_deny:1;
+	gboolean    cas_method_permitonly:1;
+} MonoMethodCasInfo;
+
 struct _MonoJitInfo {
 	/* NOTE: These first two elements (method and
 	   next_jit_code_hash) must be in the same order and at the
@@ -184,18 +199,14 @@ struct _MonoJitInfo {
 	guint32     num_clauses:15;
 	/* Whenever the code is domain neutral or 'shared' */
 	gboolean    domain_neutral:1;
-	gboolean    cas_inited:1;
-	gboolean    cas_class_assert:1;
-	gboolean    cas_class_deny:1;
-	gboolean    cas_class_permitonly:1;
-	gboolean    cas_method_assert:1;
-	gboolean    cas_method_deny:1;
-	gboolean    cas_method_permitonly:1;
+	gboolean    has_cas_info:1;
 	gboolean    has_generic_jit_info:1;
 	gboolean    has_try_block_holes:1;
 	gboolean    has_arch_eh_info:1;
 	gboolean    from_aot:1;
 	gboolean    from_llvm:1;
+	gboolean    dbg_hidden_inited:1;
+	gboolean    dbg_hidden:1;
 
 	/* FIXME: Embed this after the structure later*/
 	gpointer    gc_info; /* Currently only used by SGen */
@@ -321,12 +332,6 @@ struct _MonoDomain {
 	 */
 	GHashTable         *finalizable_objects_hash;
 
-	/* These two are boehm only */
-	/* Maps MonoObjects to a GSList of WeakTrackResurrection GCHandles pointing to them */
-	GHashTable         *track_resurrection_objects_hash;
-	/* Maps WeakTrackResurrection GCHandles to the MonoObjects they point to */
-	GHashTable         *track_resurrection_handles_hash;
-
 	/* Protects the three hashes above */
 	CRITICAL_SECTION   finalizable_objects_hash_lock;
 	/* Used when accessing 'domain_assemblies' */
@@ -367,7 +372,6 @@ struct _MonoDomain {
 
 	/* Used by threadpool.c */
 	MonoImage *system_image;
-	MonoImage *system_net_dll;
 	MonoClass *corlib_asyncresult_class;
 	MonoClass *socket_class;
 	MonoClass *ad_unloaded_ex_class;
@@ -388,7 +392,7 @@ typedef struct  {
 typedef struct  {
 	const char runtime_version [12];
 	const char framework_version [4];
-	const AssemblyVersionSet version_sets [3];
+	const AssemblyVersionSet version_sets [4];
 } MonoRuntimeInfo;
 
 #define mono_domain_lock(domain) mono_locks_acquire(&(domain)->lock, DomainLock)
@@ -487,6 +491,9 @@ mono_jit_info_get_try_block_hole_table_info (MonoJitInfo *ji) MONO_INTERNAL;
 
 MonoArchEHJitInfo*
 mono_jit_info_get_arch_eh_info (MonoJitInfo *ji) MONO_INTERNAL;
+
+MonoMethodCasInfo*
+mono_jit_info_get_cas_info (MonoJitInfo *ji) MONO_INTERNAL;
 
 /* 
  * Installs a new function which is used to return a MonoJitInfo for a method inside

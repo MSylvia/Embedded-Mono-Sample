@@ -171,36 +171,11 @@ mono_arch_xregname (int reg)
 		return "unknown";
 }
 
-G_GNUC_UNUSED static void
-break_count (void)
-{
-}
-
-G_GNUC_UNUSED static gboolean
-debug_count (void)
-{
-	static int count = 0;
-	count ++;
-
-	if (!getenv ("COUNT"))
-		return TRUE;
-
-	if (count == atoi (getenv ("COUNT"))) {
-		break_count ();
-	}
-
-	if (count > atoi (getenv ("COUNT"))) {
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
 static gboolean
 debug_omit_fp (void)
 {
 #if 0
-	return debug_count ();
+	return mono_debug_count ();
 #else
 	return TRUE;
 #endif
@@ -1202,7 +1177,7 @@ get_call_info (MonoGenericSharingContext *gsctx, MonoMemPool *mp, MonoMethodSign
  * Returns the size of the argument area on the stack.
  */
 int
-mono_arch_get_argument_info (MonoMethodSignature *csig, int param_count, MonoJitArgumentInfo *arg_info)
+mono_arch_get_argument_info (MonoGenericSharingContext *gsctx, MonoMethodSignature *csig, int param_count, MonoJitArgumentInfo *arg_info)
 {
 	int k;
 	CallInfo *cinfo = get_call_info (NULL, NULL, csig);
@@ -1784,7 +1759,7 @@ mono_arch_allocate_vars (MonoCompile *cfg)
 	} else {
 		if (cfg->arch.omit_fp)
 			cfg->arch.reg_save_area_offset = offset;
-		/* Reserve space for caller saved registers */
+		/* Reserve space for callee saved registers */
 		for (i = 0; i < AMD64_NREG; ++i)
 			if (AMD64_IS_CALLEE_SAVED_REG (i) && (cfg->used_int_regs & (1 << i))) {
 				offset += sizeof(mgreg_t);
@@ -3613,11 +3588,12 @@ mono_amd64_have_tls_get (void)
 #ifdef __APPLE__
 	static gboolean have_tls_get = FALSE;
 	static gboolean inited = FALSE;
+	guint8 *ins;
 
 	if (inited)
 		return have_tls_get;
 
-	guint8 *ins = (guint8*)pthread_getspecific;
+	ins = (guint8*)pthread_getspecific;
 
 	/*
 	 * We're looking for these two instructions:
@@ -5765,23 +5741,25 @@ mono_arch_output_basic_block (MonoCompile *cfg, MonoBasicBlock *bb)
 			 * done:
 			 */
 
-			if (value != AMD64_RDX)
-				amd64_mov_reg_reg (code, AMD64_RDX, value, 8);
-			amd64_shift_reg_imm (code, X86_SHR, AMD64_RDX, nursery_shift);
-			if (shifted_nursery_start >> 31) {
-				/*
-				 * The value we need to compare against is 64 bits, so we need
-				 * another spare register.  We use RBX, which we save and
-				 * restore.
-				 */
-				amd64_mov_membase_reg (code, AMD64_RSP, -8, AMD64_RBX, 8);
-				amd64_mov_reg_imm (code, AMD64_RBX, shifted_nursery_start);
-				amd64_alu_reg_reg (code, X86_CMP, AMD64_RDX, AMD64_RBX);
-				amd64_mov_reg_membase (code, AMD64_RBX, AMD64_RSP, -8, 8);
-			} else {
-				amd64_alu_reg_imm (code, X86_CMP, AMD64_RDX, shifted_nursery_start);
+			if (mono_gc_card_table_nursery_check ()) {
+				if (value != AMD64_RDX)
+					amd64_mov_reg_reg (code, AMD64_RDX, value, 8);
+				amd64_shift_reg_imm (code, X86_SHR, AMD64_RDX, nursery_shift);
+				if (shifted_nursery_start >> 31) {
+					/*
+					 * The value we need to compare against is 64 bits, so we need
+					 * another spare register.  We use RBX, which we save and
+					 * restore.
+					 */
+					amd64_mov_membase_reg (code, AMD64_RSP, -8, AMD64_RBX, 8);
+					amd64_mov_reg_imm (code, AMD64_RBX, shifted_nursery_start);
+					amd64_alu_reg_reg (code, X86_CMP, AMD64_RDX, AMD64_RBX);
+					amd64_mov_reg_membase (code, AMD64_RBX, AMD64_RSP, -8, 8);
+				} else {
+					amd64_alu_reg_imm (code, X86_CMP, AMD64_RDX, shifted_nursery_start);
+				}
+				br = code; x86_branch8 (code, X86_CC_NE, -1, FALSE);
 			}
-			br = code; x86_branch8 (code, X86_CC_NE, -1, FALSE);
 			amd64_mov_reg_reg (code, AMD64_RDX, ptr, 8);
 			amd64_shift_reg_imm (code, X86_SHR, AMD64_RDX, card_table_shift);
 			if (card_table_mask)
@@ -5791,7 +5769,8 @@ mono_arch_output_basic_block (MonoCompile *cfg, MonoBasicBlock *bb)
 			amd64_alu_reg_membase (code, X86_ADD, AMD64_RDX, AMD64_RIP, 0);
 
 			amd64_mov_membase_imm (code, AMD64_RDX, 0, 1, 1);
-			x86_patch (br, code);
+			if (mono_gc_card_table_nursery_check ())
+				x86_patch (br, code);
 			break;
 		}
 #ifdef MONO_ARCH_SIMD_INTRINSICS

@@ -1038,6 +1038,16 @@ mono_test_marshal_stringbuilder (char *s, int n)
 }
 
 LIBTEST_API int STDCALL  
+mono_test_marshal_stringbuilder2 (char *s, int n)
+{
+	const char m[] = "EFGH";
+
+	strncpy(s, m, n);
+	s [n] = '\0';
+	return 0;
+}
+
+LIBTEST_API int STDCALL  
 mono_test_marshal_stringbuilder_default (char *s, int n)
 {
 	const char m[] = "This is my message.  Isn't it nice?";
@@ -3164,9 +3174,12 @@ ITestOut(MonoComObject* pUnk, MonoComObject* *ppUnk)
 	return S_OK;
 }
 
+static void create_com_object (MonoComObject** pOut);
+
 LIBTEST_API int STDCALL 
 get_ITest(MonoComObject* pUnk, MonoComObject* *ppUnk)
 {
+	create_com_object (ppUnk);
 	return S_OK;
 }
 

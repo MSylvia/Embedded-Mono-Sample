@@ -410,6 +410,31 @@ typedef struct {
 } RegTrack;
 
 #ifndef DISABLE_LOGGING
+
+static void
+print_ji (MonoJumpInfo *ji)
+{
+	switch (ji->type) {
+	case MONO_PATCH_INFO_RGCTX_FETCH: {
+		MonoJumpInfoRgctxEntry *entry = ji->data.rgctx_entry;
+
+		printf ("[RGCTX_FETCH ");
+		print_ji (entry->data);
+		printf (" - %s]", mono_rgctx_info_type_to_str (entry->info_type));
+		break;
+	}
+	case MONO_PATCH_INFO_METHODCONST: {
+		char *s = mono_method_full_name (ji->data.method, TRUE);
+		printf ("[METHODCONST - %s]", s);
+		g_free (s);
+		break;
+	}
+	default:
+		printf ("[%d]", ji->type);
+		break;
+	}
+}
+
 void
 mono_print_ins_index (int i, MonoInst *ins)
 {
@@ -532,6 +557,7 @@ mono_print_ins_index (int i, MonoInst *ins)
 	case OP_IAND_IMM:
 	case OP_IOR_IMM:
 	case OP_IXOR_IMM:
+	case OP_SUB_IMM:
 		printf (" [%d]", (int)ins->inst_imm);
 		break;
 	case OP_ADD_IMM:
@@ -581,6 +607,11 @@ mono_print_ins_index (int i, MonoInst *ins)
 			char *full_name = mono_method_full_name (call->method, TRUE);
 			printf (" [%s]", full_name);
 			g_free (full_name);
+		} else if (call->fptr_is_patch) {
+			MonoJumpInfo *ji = (MonoJumpInfo*)call->fptr;
+
+			printf (" ");
+			print_ji (ji);
 		} else if (call->fptr) {
 			MonoJitICallInfo *info = mono_find_jit_icall_by_addr (call->fptr);
 			if (info)

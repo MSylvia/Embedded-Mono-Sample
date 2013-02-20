@@ -292,6 +292,7 @@ struct _MonoImage {
 	GHashTable *castclass_cache;
 	GHashTable *proxy_isinst_cache;
 	GHashTable *rgctx_template_hash; /* LOCKING: templates lock */
+	GHashTable *delegate_invoke_generic_cache;
 
 	/* Contains rarely used fields of runtime structures belonging to this image */
 	MonoPropertyHash *property_hash;
@@ -424,6 +425,10 @@ struct _MonoDynamicImage {
 	GHashTable *vararg_aux_hash;
 	MonoGHashTable *generic_def_objects;
 	MonoGHashTable *methodspec;
+	/*
+	 * Maps final token values to the object they describe.
+	 */
+	MonoGHashTable *remapped_tokens;
 	gboolean run;
 	gboolean save;
 	gboolean initial_image;

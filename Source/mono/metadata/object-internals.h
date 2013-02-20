@@ -83,7 +83,7 @@
 #endif
 
 #define MONO_CHECK_ARG(arg, expr)		G_STMT_START{		  \
-     if (!(expr))							  \
+		if (G_UNLIKELY (!(expr)))							  \
        {								  \
 		MonoException *ex;					  \
 		char *msg = g_strdup_printf ("assertion `%s' failed",	  \
@@ -95,7 +95,7 @@
        };				}G_STMT_END
 
 #define MONO_CHECK_ARG_NULL(arg)	    G_STMT_START{		  \
-     if (arg == NULL)							  \
+		if (G_UNLIKELY (arg == NULL))						  \
        {								  \
 		MonoException *ex;					  \
 		if (arg) {} /* check if the name exists */		  \
@@ -246,6 +246,7 @@ struct _MonoException {
 	MonoString *source;
 	MonoObject *_data;
 	MonoObject *captured_traces;
+	MonoArray  *native_trace_ips;
 };
 
 typedef struct {
@@ -375,8 +376,6 @@ struct _MonoInternalThread {
 	volatile int lock_thread_id; /* to be used as the pre-shifted thread id in thin locks. Used for appdomain_ref push/pop */
 	HANDLE	    handle;
 	MonoArray  *cached_culture_info;
-	gpointer    unused1;
-	MonoBoolean threadpool_thread;
 	gunichar2  *name;
 	guint32	    name_len;
 	guint32	    state;
@@ -389,7 +388,10 @@ struct _MonoInternalThread {
 	gpointer jit_data;
 	void *thread_info; /*This is MonoThreadInfo*, but to simplify dependencies, let's make it a void* here. */
 	MonoAppContext *current_appcontext;
-	int stack_size;
+	MonoException *pending_exception;
+	MonoThread *root_domain_thread;
+	MonoObject *_serialized_principal;
+	int _serialized_principal_version;
 	gpointer appdomain_refs;
 	/* This is modified using atomic ops, so keep it a gint32 */
 	gint32 interruption_requested;
@@ -397,25 +399,30 @@ struct _MonoInternalThread {
 	gpointer suspended_event;
 	gpointer resume_event;
 	CRITICAL_SECTION *synch_cs;
+	MonoBoolean threadpool_thread;
 	MonoBoolean thread_dump_requested;
-	gpointer end_stack; /* This is only used when running in the debugger. */
 	MonoBoolean thread_interrupt_requested;
+	gpointer end_stack; /* This is only used when running in the debugger. */
+	int stack_size;
 	guint8	apartment_state;
 	gint32 critical_region_level;
-	guint32 unused0;	
+	gint32 managed_id;
+	guint32 small_id;
 	MonoThreadManageCallback manage_callback;
-	MonoException *pending_exception;
-	MonoThread *root_domain_thread;
 	gpointer interrupt_on_stop;
 	gsize    flags;
 	gpointer android_tid;
 	gpointer thread_pinning_ref;
-	gint32 managed_id;
 	gint32 ignore_next_signal;
 	/* 
 	 * These fields are used to avoid having to increment corlib versions
-	 * when a new field is added to the unmanaged MonoThread structure.
+	 * when a new field is added to this structure.
+	 * Please synchronize any changes with InternalThread in Thread.cs, i.e. add the
+	 * same field there.
 	 */
+	gpointer unused0;
+	gpointer unused1;
+	gpointer unused2;
 };
 
 struct _MonoThread {
@@ -1221,6 +1228,21 @@ typedef struct {
 
 typedef struct {
 	MonoObject object;
+	MonoString *marshal_cookie;
+	MonoString *marshal_type;
+	MonoReflectionType *marshal_type_ref;
+	MonoReflectionType *marshal_safe_array_user_defined_subtype;
+	guint32 utype;
+	guint32 array_subtype;
+	gint32 safe_array_subtype;
+	gint32 size_const;
+	gint32 IidParameterIndex;
+	gint16 size_param_index;
+} MonoReflectionMarshalAsAttribute;
+
+
+typedef struct {
+	MonoObject object;
 	gint32 call_conv;
 	gint32 charset;
 	MonoString *dll;
@@ -1391,7 +1413,7 @@ MonoArray  *mono_reflection_sighelper_get_signature_local (MonoReflectionSigHelp
 
 MonoArray  *mono_reflection_sighelper_get_signature_field (MonoReflectionSigHelper *sig) MONO_INTERNAL;
 
-MonoReflectionMarshal* mono_reflection_marshal_from_marshal_spec (MonoDomain *domain, MonoClass *klass, MonoMarshalSpec *spec) MONO_INTERNAL;
+MonoReflectionMarshalAsAttribute* mono_reflection_marshal_as_attribute_from_marshal_spec (MonoDomain *domain, MonoClass *klass, MonoMarshalSpec *spec) MONO_INTERNAL;
 
 gpointer
 mono_reflection_lookup_dynamic_token (MonoImage *image, guint32 token, gboolean valid_token, MonoClass **handle_class, MonoGenericContext *context) MONO_INTERNAL;
@@ -1572,6 +1594,12 @@ mono_string_to_utf8_mp_ignore (MonoMemPool *mp, MonoString *s) MONO_INTERNAL;
 
 gboolean
 mono_monitor_is_il_fastpath_wrapper (MonoMethod *method) MONO_INTERNAL;
+
+char *
+mono_exception_get_native_backtrace (MonoException *exc) MONO_INTERNAL;
+
+MonoString *
+ves_icall_Mono_Runtime_GetNativeStackTrace (MonoException *exc) MONO_INTERNAL;
 
 #endif /* __MONO_OBJECT_INTERNALS_H__ */
 

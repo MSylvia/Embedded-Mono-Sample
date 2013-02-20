@@ -33,6 +33,7 @@
 
 /* sys/resource.h (for rusage) is required when using osx 10.3 (but not 10.4) */
 #ifdef __APPLE__
+#include <TargetConditionals.h>
 #include <sys/resource.h>
 #ifdef HAVE_LIBPROC_H
 /* proc_name */
@@ -1953,6 +1954,7 @@ static GSList *load_modules (FILE *fp)
 static gboolean match_procname_to_modulename (gchar *procname, gchar *modulename)
 {
 	char* lastsep = NULL;
+	char* lastsep2 = NULL;
 	char* pname = NULL;
 	char* mname = NULL;
 	gboolean result = FALSE;
@@ -1971,6 +1973,18 @@ static gboolean match_procname_to_modulename (gchar *procname, gchar *modulename
 		if (lastsep)
 			if (!strcmp (lastsep+1, pname))
 				result = TRUE;
+		if (!result) {
+			lastsep2 = strrchr (pname, '/');
+			if (lastsep2){
+				if (lastsep) {
+					if (!strcmp (lastsep+1, lastsep2+1))
+						result = TRUE;
+				} else {
+					if (!strcmp (mname, lastsep2+1))
+						result = TRUE;
+				}
+			}
+		}
 	}
 
 	g_free (pname);
@@ -2123,7 +2137,7 @@ static gchar *get_process_name_from_proc (pid_t pid)
 	}
 	g_free (filename);
 #elif defined(PLATFORM_MACOSX)
-#if (MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5) && !defined (__mono_ppc__) && !defined(__arm__)
+#if !defined (__mono_ppc__) && defined (TARGET_OSX)
 	/* No proc name on OSX < 10.5 nor ppc nor iOS */
 	memset (buf, '\0', sizeof(buf));
 	proc_name (pid, buf, sizeof(buf));

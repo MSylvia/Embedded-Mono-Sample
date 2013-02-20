@@ -20,6 +20,7 @@ namespace ClassLibraryNamespace
 			//Xamarin6035_AssemblyResolve_Crash();
 
 			// Uncomment to test bug 5938 related to a CSharpCodeProvider freeze
+            // This does not work as of Mono 3.0.2, CodeDomProvider.GetProvider("C#") throws an exception.
 			//TestJIT();
 		}
 
@@ -46,7 +47,7 @@ namespace ClassLibraryNamespace
             {
 				Console.WriteLine("Compiling script {0}", script);
 
-				using (var provider = CodeDomProvider.CreateProvider("csharp"))
+				using (var provider = CodeDomProvider.CreateProvider("C#"))
 				{
 					Action action = () => provider.CompileAssemblyFromFile(compilerParameters, script);
 					try
